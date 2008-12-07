@@ -3,9 +3,14 @@
 Plugin Name: MediaRSS
 Plugin URI: http://wordpress.org/extend/plugins/mrss/
 Description: Adds &lt;media&gt; tags to your feeds.
-Version: 1.0
+Version: 1.1
 Author: Andy Skelton
 Author URI: http://andy.wordpress.com/
+
+FriendFeed image thumbnail compatibility modifications by Daniel J. Pritchett
+on the advice of Paul Reynolds (http://friendfeed.com/screwtheman). This adds
+the first image in the post as the post's own thumbnail.
+
 */
 
 add_action('template_redirect', 'mrss_init');
@@ -23,24 +28,66 @@ function mrss_init() {
 }
 
 function mrss_ns() {
-	?>xmlns:media="http://search.yahoo.com/mrss"
+	?>xmlns:media="http://search.yahoo.com/mrss/"
 	<?php
 }
 
-function mrss_item($content = null) {
+function mrss_item() {
+	global $mrss_gallery_lookup;
 	$media = array();
 
-	if ( !isset( $content ) )
-		$content = get_the_content();
+	// Honor the feed settings. Don't include any media that isn't in the feed.
+	if ( get_option('rss_use_excerpt') || !strlen( get_the_content() ) ) {
+		$content = the_excerpt_rss();
+	} else {
+		// If any galleries are processed, we need to capture the attachment IDs.
+		add_filter( 'wp_get_attachment_link', 'mrss_gallery_lookup', 10, 5 );
+		$content = apply_filters( 'the_content', get_the_content() );
+		remove_filter( 'wp_get_attachment_link', 'mrss_gallery_lookup', 10, 5 );
+		$lookup = $mrss_gallery_lookup;
+		unset($mrss_gallery_lookup);
+	}
 
 	// img tags
+	$images = 0;
 	if ( preg_match_all('/<img (.+?)>/', $content, $matches) ) {
 		foreach ( $matches[1] as $attrs ) {
 			$item = $img = array();
+			// Construct $img array from <img> attributes
 			foreach ( wp_kses_hair($attrs, array('http')) as $attr )
 				$img[$attr['name']] = $attr['value'];
 			if ( !isset($img['src']) )
 				continue;
+			$id = false;
+			if ( isset( $lookup[$img['src']] ) ) {
+				$id = $lookup[$img['src']];
+			} elseif ( isset( $img['class'] ) && preg_match( '/wp-image-(\d+)/', $img['class'], $match ) ) {
+				$id = $match[1];
+			}
+			if ( $id ) {
+				// It's an attachment, so we will get the URLs, title, and description from functions
+				$attachment =& get_post( $id );
+				$src = wp_get_attachment_image_src( $id, 'full' );
+				if ( !empty( $src[0] ) )
+					$img['src'] = $src[0];
+				$thumbnail = wp_get_attachment_image_src( $id, 'thumbnail' );
+				if ( !empty( $thumbnail[0] ) && $thumbnail[0] != $img['src'] )
+					$img['thumbnail'] = $thumbnail[0];
+				$title = get_the_title( $id );
+				if ( !empty( $title ) )
+					$img['title'] = trim($title);
+				$description = get_the_content( $id );
+				if ( !empty( $attachment->post_excerpt ) )
+					$img['description'] = trim($attachment->post_excerpt);
+			}
+			// If this is the first image in the markup, make it the post thumbnail
+			if ( ++$images == 1 ) {
+				if ( isset( $img['thumbnail'] ) )
+					$media[]['thumbnail']['attr']['url'] = $img['thumbnail'];
+				else
+					$media[]['thumbnail']['attr']['url'] = $img['src'];
+			}
+
 			$item['content']['attr']['url'] = $img['src'];
 			$item['content']['attr']['medium'] = 'image';
 			if ( !empty($img['title']) ) {
@@ -50,18 +97,36 @@ function mrss_item($content = null) {
 				$item['content']['children']['title']['attr']['type'] = 'html';
 				$item['content']['children']['title']['children'][] = $img['alt'];
 			}
+			if ( !empty($img['description']) ) {
+				$item['content']['children']['description']['attr']['type'] = 'html';
+				$item['content']['children']['description']['children'][] = $img['description'];
+			}
+			if ( !empty($img['thumbnail']) )
+				$item['content']['children']['thumbnail']['attr']['url'] = $img['thumbnail'];
 			$media[] = $item;
 		}
 	}
 
 	$media = apply_filters('mrss_media', $media);
 
-	if ( !empty($media) )
-		foreach( $media as $item )
-			mrss_print($item);
+	mrss_print($media);
 }
 
-function mrss_print($element, $indent = 2) {
+function mrss_gallery_lookup($link, $id, $size, $permalink, $icon) {
+	global $mrss_gallery_lookup;
+	preg_match( '/ src="(.*?)"/', $link, $matches );
+	$mrss_gallery_lookup[$matches[1]] = $id;
+	return $link;
+}
+
+function mrss_print($media) {
+	if ( !empty($media) )
+		foreach( $media as $element )
+			mrss_print_element($element);
+	echo "\n";
+}
+
+function mrss_print_element($element, $indent = 2) {
 	echo "\n";
 	foreach ( $element as $name => $data ) {
 		echo str_repeat("\t", $indent) . "<media:$name";
@@ -77,14 +142,14 @@ function mrss_print($element, $indent = 2) {
 					echo $_data;
 				} else {
 					$nl = true;
-					mrss_print( array( $_name => $_data ), $indent + 1 );
+					mrss_print_element( array( $_name => $_data ), $indent + 1 );
 				}
 			}
 			if ( $nl )
-				echo str_repeat("\t", $indent);
-			echo "</media:$name>\n";
+				echo "\n" . str_repeat("\t", $indent);
+			echo "</media:$name>";
 		} else {
-			echo " />\n";
+			echo " />";
 		}
 	}
 }
@@ -146,4 +211,3 @@ function mrss_audio_macro($media) {
 add_filter('mrss_media', 'mrss_audio_macro');
 */
 
-?>
