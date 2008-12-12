@@ -3,7 +3,7 @@
 Plugin Name: MediaRSS
 Plugin URI: http://wordpress.org/extend/plugins/mrss/
 Description: Adds &lt;media&gt; tags to your feeds.
-Version: 1.1.1
+Version: 1.1.2
 Author: Andy Skelton
 Author URI: http://andy.wordpress.com/
 
@@ -58,6 +58,7 @@ function mrss_item() {
 				$img[$attr['name']] = $attr['value'];
 			if ( !isset($img['src']) )
 				continue;
+			$img['src'] = mrss_url($img['src']);
 			// Skip emoticons
 			if ( isset( $img['class'] ) && false !== strpos( $img['class'], 'wp-smiley' ) )
 				continue;
@@ -113,6 +114,14 @@ function mrss_item() {
 	$media = apply_filters('mrss_media', $media);
 
 	mrss_print($media);
+}
+
+function mrss_url($url) {
+	if ( preg_match( '!^https?://!', $url ) )
+		return $url;
+	if ( $url{0} == '/' )
+		return rtrim( get_bloginfo('home'), '/' ) . $url;
+	return get_bloginfo('home') . $url;
 }
 
 function mrss_gallery_lookup($link, $id, $size, $permalink, $icon) {
