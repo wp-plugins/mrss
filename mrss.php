@@ -3,7 +3,7 @@
 Plugin Name: MediaRSS
 Plugin URI: http://wordpress.org/extend/plugins/mrss/
 Description: Adds &lt;media&gt; tags to your feeds.
-Version: 1.1.3
+Version: 1.1.4
 Author: Andy Skelton
 Author URI: http://andy.wordpress.com/
 
@@ -28,7 +28,9 @@ function mrss_init() {
 }
 
 function mrss_ns() {
-	?>xmlns:media="http://search.yahoo.com/mrss/"
+	?>
+
+	xmlns:media="http://search.yahoo.com/mrss/"
 	<?php
 }
 
