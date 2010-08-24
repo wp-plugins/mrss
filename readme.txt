@@ -18,3 +18,7 @@ Installing should be a piece of cake and take fewer than five minutes.
 
 1. Upload `mrss.php` to your `/wp-content/plugins/` directory.
 2. Activate the plugin through the 'Plugins' menu in WordPress.
+
+== Changelog ==
+
+* Fixed issue with unencoded ampersands. Thanks to Justin Chen for reporting this and testing the patch.

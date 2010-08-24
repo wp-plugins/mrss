@@ -146,14 +146,14 @@ function mrss_print_element($element, $indent = 2) {
 		echo str_repeat("\t", $indent) . "<media:$name";
 		if ( !empty($data['attr']) ) {
 			foreach ( $data['attr'] as $attr => $value )
-				echo " $attr=\"" . ent2ncr($value) . "\"";
+				echo " $attr=\"" . esc_attr(ent2ncr($value)) . "\"";
 		}
 		if ( !empty($data['children']) ) {
 			$nl = false;
 			echo ">";
 			foreach ( $data['children'] as $_name => $_data ) {
 				if ( is_int($_name) ) {
-					echo ent2ncr($_data);
+					echo ent2ncr(esc_html($_data));
 				} else {
 					$nl = true;
 					mrss_print_element( array( $_name => $_data ), $indent + 1 );
